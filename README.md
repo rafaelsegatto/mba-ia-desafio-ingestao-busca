@@ -1,5 +1,115 @@
 # Ingestão e Busca Semântica com LangChain e Postgres
 
+Sistema RAG (Retrieval-Augmented Generation) que ingesta um PDF em um banco
+PostgreSQL com pgVector e responde perguntas via CLI, usando apenas o conteúdo
+do documento como base.
+
+---
+
+# COMO EXECUTAR
+
+Esta seção tem as instruções de execução do projeto. Ela termina no separador antes da seção "Enunciado Original do Desafio", mais abaixo.
+
+## Requisitos
+
+- **Python 3.10 ou superior** (o Python 3.9 padrão do macOS não funciona, pois as dependências exigem 3.10+)
+- **Docker & Docker Compose**
+- **Chave de API da OpenAI com créditos** (sem créditos, a ingestão falha com erro 429)
+
+## Passo a passo
+
+### 1. Clonar o repositório e criar o ambiente virtual
+
+```bash
+git clone git@github.com:rafaelsegatto/mba-ia-desafio-ingestao-busca.git
+cd mba-ia-desafio-ingestao-busca
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2. Configurar as variáveis de ambiente
+
+Copie o template e edite o `.env`:
+
+```bash
+cp .env.example .env
+```
+
+Preencha no `.env`:
+
+| Variável | Descrição | Exemplo |
+|---|---|---|
+| `OPENAI_API_KEY` | Sua chave da OpenAI (obrigatória) | `sk-...` |
+| `OPENAI_EMBEDDING_MODEL` | Modelo de embeddings | `text-embedding-3-small` |
+| `OPENAI_CHAT_MODEL` | Modelo de LLM para responder | `gpt-4o-mini` |
+| `DATABASE_URL` | Conexão com o Postgres | `postgresql+psycopg://postgres:postgres@localhost:5432/rag` |
+| `PG_VECTOR_COLLECTION_NAME` | Nome da collection vetorial | `documentos` |
+| `PDF_PATH` | Caminho do PDF para ingerir | `document.pdf` |
+
+> Atenção: o arquivo `.env` contém sua chave secreta e está no `.gitignore`. Ele nunca será enviado ao GitHub.
+
+### 3. Subir o banco de dados
+
+```bash
+docker compose up -d
+```
+
+Isso sobe um PostgreSQL 17 com a extensão pgVector (a extensão é criada automaticamente).
+
+### 4. Ingerir o PDF
+
+```bash
+python src/ingest.py
+```
+
+O PDF é dividido em chunks de **1000 caracteres com overlap de 150**, vetorizados e salvos no Postgres.
+
+### 5. Rodar o chat
+
+```bash
+python src/chat.py
+```
+
+Digite perguntas no terminal. Para encerrar, digite `sair` ou use `Ctrl+C`.
+
+Exemplo:
+
+```
+PERGUNTA: Qual o faturamento da Empresa SuperTechIABrazil?
+RESPOSTA: O faturamento da empresa SuperTechIABrazil é R$ 10.000.000,00.
+
+PERGUNTA: Quantos clientes temos em 2024?
+RESPOSTA: Não tenho informações necessárias para responder sua pergunta.
+```
+
+## Estrutura do projeto
+
+```
+├── docker-compose.yml     # PostgreSQL + pgVector
+├── requirements.txt       # Dependências
+├── .env.example           # Template das variáveis de ambiente
+├── .env                   # Suas configurações reais (não versionado)
+├── src/
+│   ├── ingest.py          # Ingestão: PDF → chunks → embeddings → Postgres
+│   ├── search.py          # Busca semântica (k=10) + prompt + LLM
+│   └── chat.py            # CLI de interação
+└── document.pdf           # PDF de exemplo
+```
+
+## Notas importantes
+
+- **Dimensão dos embeddings**: a tabela vetorial é criada na primeira ingestão com a dimensão do modelo escolhido (1536 para `text-embedding-3-small`). Se trocar o modelo de embeddings depois, apague a collection (`docker compose down -v`) e refaça a ingestão.
+- **Re-ingestão**: rodar `ingest.py` novamente é seguro, pois a collection é recriada do zero, sem duplicação de chunks.
+- **Modelos usados**: `text-embedding-3-small` (embeddings) e `gpt-4o-mini` (LLM), ambos leves e baratos. Consulte a [documentação da OpenAI](https://platform.openai.com/docs) para opções atuais.
+
+---
+
+# ENUNCIADO ORIGINAL DO DESAFIO
+
+> Abaixo começa o enunciado original, herdado do fork. A seção "Como executar" termina aqui.
+
 ## Objetivo
 
 Você deve entregar um software capaz de:
